@@ -61,36 +61,38 @@ class YTDLSource(discord.PCMVolumeTransformer):
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.queue = asyncio.Queue()
-        self.current = None
-        self.is_playing = False
-        self.loop = False  # 반복 여부 추가
-        self.volume = 100  # 기본 볼륨 100%
-        self.nowplaying_message = None  # 🔹 현재 재생 중인 메시지를 저장하는 변수 추가
+        self.queue = {}  # 🔹 서버별 대기열 관리
+        self.current = {}  # 🔹 서버별 현재 재생 곡
+        self.is_playing = {}  # 🔹 서버별 재생 여부
+        self.loop = {}  # 🔹 서버별 반복 여부
+        self.volume = {}  # 🔹 서버별 볼륨 크기
+        self.nowplaying_message = {}  # 🔹 서버별 nowplaying 메시지 관리
         
-    async def reset_state(self):
-        """봇의 음악 관련 상태를 완전히 초기화"""
-        self.queue = asyncio.Queue()  # 대기열 초기화
-        self.current = None  # 현재 재생 곡 초기화
-        self.is_playing = False  # 재생 상태 초기화
-        self.loop = False  # 반복 상태 초기화
-        self.volume = 100  # 기본 볼륨 초기화
-        self.nowplaying_message = None  # Now Playing 메시지 초기화
+    async def reset_state(self, guild_id):
+        """서버별 음악 상태 초기화"""
+        self.queue[guild_id] = asyncio.Queue()
+        self.current[guild_id] = None
+        self.is_playing[guild_id] = False
+        self.loop[guild_id] = False
+        self.volume[guild_id] = 100
+        if guild_id in self.nowplaying_message:
+            del self.nowplaying_message[guild_id]  # 🔹 nowplaying 메시지 삭제
         
     async def update_UI(self, interaction: discord.Interaction):
     # ✅ `nowplaying_logic()`을 직접 호출하여 메시지를 업데이트
         nowplaying_embed = await self.nowplaying_logic(interaction)
         
-        if self.nowplaying_message:
-            if isinstance(nowplaying_embed, str):
-                await self.nowplaying_message.edit(content=nowplaying_embed)   
+        if interaction.guild.voice_client.is_connected():
+            if self.nowplaying_message:
+                if isinstance(nowplaying_embed, str):
+                    await self.nowplaying_message.edit(content=nowplaying_embed)   
+                else:
+                    await self.nowplaying_message.edit(content="", embed=nowplaying_embed)    
             else:
-                await self.nowplaying_message.edit(content="", embed=nowplaying_embed)    
-        else:
-            if isinstance(nowplaying_embed, str):
-                self.nowplaying_message = await interaction.followup.send(content=nowplaying_embed)   
-            else:
-                self.nowplaying_message = await interaction.followup.send(content="", embed=nowplaying_embed)
+                if isinstance(nowplaying_embed, str):
+                    self.nowplaying_message = await interaction.followup.send(content=nowplaying_embed)   
+                else:
+                    self.nowplaying_message = await interaction.followup.send(content="", embed=nowplaying_embed)
 
     async def join_logic(self, interaction: discord.Interaction):
         """봇이 사용자의 음성 채널에 참가 (명령어가 아닌 일반 함수)"""
@@ -177,9 +179,11 @@ class Music(commands.Cog):
             interaction.guild.voice_client.play(
                 self.current, after=lambda e: self.bot.loop.create_task(self.play_next_after(interaction, e))
             )
+            await self.update_UI(interaction)            
         else:
-            await self.reset_state() # ✅ 모든 곡이 끝났을 때 상태 초기화
-        await self.update_UI(interaction)            
+            await self.update_UI(interaction)
+            # print("이건안실행하나?")            
+            # await self.reset_state() # ✅ 모든 곡이 끝났을 때 상태 초기화
         
     async def play_next_after(self, interaction: discord.Interaction, error):
         if error:
@@ -192,7 +196,12 @@ class Music(commands.Cog):
 
         # 봇이 음성 채널에 연결되어 있는지 확인
         if not interaction.guild.voice_client or not interaction.guild.voice_client.is_playing():
-            return "❌ 현재 재생 중인 노래가 없습니다."
+            embed = discord.Embed(
+                title="■ 정지",
+                description="현재 재생 목록이 없어요.",
+                color=discord.Color.dark_gray()
+            )
+            return embed
 
         # 현재 곡 정보 가져오기
         player = self.current
@@ -274,10 +283,16 @@ class Music(commands.Cog):
         """음성 채널 퇴장"""
         await interaction.response.defer(ephemeral=True)  # 응답 예약 (숨김 처리)
 
-        await self.reset_state()  # ✅ 상태 초기화 실행
+        embed = discord.Embed(
+            title="■ 정지",
+            description="재생을 정지하고 음성 채널을 나갔어요.",
+            color=discord.Color.dark_gray()
+        )
         
         # 봇이 음성 채널에 연결되어 있는지 확인
         if interaction.guild.voice_client:
+            await self.nowplaying_message.edit(content="", embed=embed)
+            await self.reset_state()
             await interaction.guild.voice_client.disconnect()
             await interaction.followup.send(f"🚫 봇이 `{interaction.user.voice.channel}` 채널에서 퇴장했습니다.", ephemeral=True)
         else:
@@ -359,6 +374,9 @@ async def on_ready():
     print(f"{bot.user} 봇 실행!! (ID: {bot.user.id})")
     print("------")
 
+    activity = discord.Activity(type=discord.ActivityType.playing, name="서재원 때리기")
+    await bot.change_presence(status=discord.Status.online, activity=activity)
+    
     try:
         await bot.tree.sync()  # 서버 제한 없이 모든 서버에서 동기화
         print("✅ 모든 서버에서 슬래시 명령어 동기화 완료!")
