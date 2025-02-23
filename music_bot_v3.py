@@ -30,6 +30,9 @@ ytdl_format_options = {
     'no_warnings': True,
     'default_search': 'auto',
     'source_address': '0.0.0.0',
+    'extract_flat': False,  # 🔹 메타데이터만 가져오지 않고 실제 URL을 파싱
+    'skip_download': True,  # 🔹 영상 다운로드 없이 메타데이터만 가져오기
+    'force_generic_extractor': False,  # 🔹 유튜브 관련 API 우선 사용
 }
 
 
@@ -60,6 +63,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
         try:
             data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+            print(data)
         except Exception as e:
             print(f"❌ YTDL 에러 발생: {e}")  # 오류 출력
             return []
@@ -86,6 +90,11 @@ class YTDLSource(discord.PCMVolumeTransformer):
         if data.get("requires_premium", False):
             print("⚠️ 프리미엄 전용 영상은 재생할 수 없음")
             return []
+        
+        # ✅ 관련 영상이 존재하지 않는 경우 기본값 설정
+        related_videos = data.get("related_videos", [])
+        if not related_videos:
+            print("⚠️ 관련 영상이 존재하지 않음 (빈 리스트 반환)")
 
         return [cls(discord.FFmpegPCMAudio(data["url"], **ffmpeg_options), data=data)] if "url" in data else []
 
@@ -100,7 +109,7 @@ class Music(commands.Cog):
         self.volume = {}  # 🔹 서버별 볼륨 크기
         self.nowplaying_message = {}  # 🔹 서버별 nowplaying 메시지 관리
         self.autoplay = {}  # 🔹 서버별 추천곡 자동 재생 여부 (기본값: ON)
-        
+
     async def reset_state(self, guild_id):
         """서버별 음악 상태 초기화"""
         if guild_id in self.queue:
@@ -222,7 +231,7 @@ class Music(commands.Cog):
     async def play_next(self, interaction: discord.Interaction):
         """서버별 다음 곡 자동 재생 (추천곡 기능 ON/OFF 반영)"""
         guild_id = interaction.guild.id  # ✅ 현재 서버 ID 가져오기
-
+        
         if guild_id in self.queue and not self.queue[guild_id].empty():
             self.current[guild_id] = await self.queue[guild_id].get()
             self.is_playing[guild_id] = True
@@ -235,10 +244,11 @@ class Music(commands.Cog):
             await self.update_UI(interaction)
         
         # ✅ 대기열이 비었을 경우 → 추천곡 기능이 켜져 있으면 유튜브 자동 추천곡 추가
-        elif self.current.get(guild_id) and self.current[guild_id].related_videos and self.autoplay.get(guild_id, True):
+        elif self.current[guild_id].related_videos and self.autoplay.get(guild_id, True):
+            print(f"{self.current[guild_id].related_videos}")
             related_video = self.current[guild_id].related_videos[0]  # ✅ 첫 번째 추천곡 선택
             related_url = f"https://www.youtube.com/watch?v={related_video['id']}"
-
+            print(f"자동 재생 기능 사용 중. 재생 url : {related_url}")
             try:
                 tracks = await YTDLSource.from_url(related_url, loop=self.bot.loop, stream=True)
                 if tracks:
@@ -249,6 +259,7 @@ class Music(commands.Cog):
                 await interaction.followup.send(f"❌ 추천곡을 가져오는 중 오류 발생: {e}", ephemeral=True)
 
         else:
+            print(f"{self.current[guild_id].related_videos}")
             await self.update_UI(interaction)
 
         
