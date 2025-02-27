@@ -99,10 +99,13 @@ If you prefer to deploy the bot using Docker, you can create a `Dockerfile` simi
 FROM python:3.11-slim
 
 WORKDIR /app
-COPY requirements.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY music_bot_v4_20250224.py .
+
+RUN pip install discord.py yt-dlp ffmpeg-python pynacl python-dotenv
+
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+
 CMD ["python", "music_bot_v4_20250224.py"]
 ```
 
