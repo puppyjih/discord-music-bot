@@ -15,6 +15,7 @@ A Discord Music Bot built using **discord.py v2.x** and **yt-dlp**. This bot sup
 - Python 3.8+ (Python 3.11 is recommended)
 - pip (latest version recommended)
 - A Discord Bot Token
+```
 
 ## Installation
 
