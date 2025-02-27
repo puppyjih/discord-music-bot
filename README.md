@@ -1,4 +1,3 @@
-```
 # Discord Music Bot
 
 A Discord Music Bot built using **discord.py v2.x** and **yt-dlp**. This bot supports slash commands and manages playback using a single editable embed message for "now playing". It also features an autoplay chain that sequentially fetches related tracks based on a reference track (the last song added by the user).
@@ -15,7 +14,7 @@ A Discord Music Bot built using **discord.py v2.x** and **yt-dlp**. This bot sup
 - Python 3.8+ (Python 3.11 is recommended)
 - pip (latest version recommended)
 - A Discord Bot Token
-```
+
 
 ## Installation
 
