@@ -51,7 +51,7 @@ A Discord Music Bot built using **discord.py v2.x** and **yt-dlp**. This bot sup
 Run the bot with:
 
 ```bash
-python music_bot_v4_20250224.py
+python music_bot_v4.py
 ```
 
 ## Command Overview
@@ -100,13 +100,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY music_bot_v4_20250224.py .
+COPY music_bot_v4.py .
 
 RUN pip install discord.py yt-dlp ffmpeg-python pynacl python-dotenv
 
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
-CMD ["python", "music_bot_v4_20250224.py"]
+CMD ["python", "music_bot_v4.py"]
 ```
 
 Build and run the Docker container with:
