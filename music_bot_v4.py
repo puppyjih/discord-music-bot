@@ -191,7 +191,27 @@ class Music(commands.Cog):
         if "🚫" in join_result:
             await interaction.response.send_message(join_result, ephemeral=True)
             return
-        await interaction.response.defer()
+                       
+        await interaction.response.send_message(
+            f"🔎 {url} 대기열에 추가 중...",
+            ephemeral=True
+        )
+
+        async def delete_ephemeral():
+            await asyncio.sleep(3)
+            try:
+                await interaction.delete_original_response()
+            except discord.NotFound:
+                pass
+        
+        asyncio.create_task(delete_ephemeral())
+
+        if guild_id not in self.nowplaying_message:
+            channel = interaction.channel
+            persistent_msg = await channel.send("로딩 중 ⏳")
+            self.nowplaying_message[guild_id] = persistent_msg
+        
+        # await interaction.response.defer()
         voice_client = interaction.guild.voice_client
         if not voice_client or not voice_client.is_connected():
             await interaction.followup.send("❌ 봇이 음성 채널에 연결되지 못했습니다.", ephemeral=True)
